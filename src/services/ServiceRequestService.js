@@ -51,19 +51,7 @@ export const getServiceRequests = async () => {
   }
 };
 
-// Fetch service requests by status
-export const getServiceRequestsByStatus = async (status) => {
-  try {
-    const token = getToken();
-    const response = await axios.get(`${SERVICE_REQUEST_BASE_URL}/Status/${status}`, {
-      headers: { Authorization: token },
-    });
-    console.log(`Fetched Service Requests [Status: ${status}]:`, response.data);
-    return response.data;
-  } catch (error) {
-    handleError(error, 'Fetching Service Requests by Status');
-  }
-};
+
 
 // Fetch a service request by ID
 export const getServiceRequestById = async (id) => {

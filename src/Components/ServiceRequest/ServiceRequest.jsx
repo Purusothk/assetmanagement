@@ -151,12 +151,16 @@ const ServiceRequest = () => {
       const payload = {
         serviceId: parseInt(newRequest.serviceId, 10),
         assetId: parseInt(newRequest.assetId, 10),
+        assetName: assets.find(asset => asset.assetId === parseInt(newRequest.assetId, 10))?.assetName || "Unknown", 
         userId: parseInt(newRequest.userId, 10),
+        userName: decoded?.userName || "Unknown",  
         serviceRequestDate: newRequest.serviceRequestDate ? new Date(newRequest.serviceRequestDate) : new Date(),
         issue_Type: parseInt(newRequest.issueType, 10),
         serviceDescription: newRequest.serviceDescription,
         serviceReqStatus: parseInt(newRequest.serviceReqStatus, 10),
       };
+      
+      
       console.log("Payload for update:", payload); // Debugging log
       const response = await updateServiceRequest(payload.serviceId, payload);
       if (response) {
@@ -380,31 +384,39 @@ const ServiceRequest = () => {
             </tr>
           </thead>
           <tbody>
-            {currentRequests.map((request) => (
-              <tr key={request.serviceId} style={styles.tableRow}>
-                <td style={styles.tableCell}>{request.serviceId}</td>
-                <td style={styles.tableCell}>{assets.find(asset => asset.assetId === request.assetId)?.assetName || 'N/A'}</td>
-                <td style={styles.tableCell}>{request.userId}</td>
-                <td style={styles.tableCell}>{issueTypes[request.issue_Type]}</td>
+          {currentRequests.map((request) => (
+            <tr key={request.serviceId} style={styles.tableRow}>
+              <td style={styles.tableCell}>{request.serviceId}</td>
+              
+               
+              <td style={styles.tableCell}>{request.assetName || 'N/A'}</td> 
+
+              <td style={styles.tableCell}>{request.userId}</td>
+
+               
+              <td style={styles.tableCell}>{request.issueTypeName || 'N/A'}</td>
+
+              <td style={styles.tableCell}>
+                {request.serviceRequestDate ? new Date(request.serviceRequestDate).toLocaleDateString() : 'N/A'}
+              </td>
+
+               
+              <td style={styles.tableCell}>{request.serviceReqStatusName || 'N/A'}</td>
+
+              {decoded && decoded.role === "Admin" && (
                 <td style={styles.tableCell}>
-                  {request.serviceRequestDate ? new Date(request.serviceRequestDate).toLocaleDateString() : new Date().toLocaleDateString()}
+                  <button
+                    onClick={() => handleUpdateServiceRequest(request.serviceId)}
+                    style={styles.actionButton}
+                  >
+                    Update
+                  </button>
                 </td>
-                <td style={styles.tableCell}>
-                  {serviceStatuses[request.serviceReqStatus]}
-                </td>
-                {decoded && decoded.role === "Admin" && (
-                  <td style={styles.tableCell}>
-                    <button
-                      onClick={() => handleUpdateServiceRequest(request.serviceId)}
-                      style={styles.actionButton}
-                    >
-                      Update
-                    </button>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
+              )}
+            </tr>
+          ))}
+        </tbody>
+
         </table>
   
         <CustomPagination

@@ -82,6 +82,41 @@ export const getAssetDetails = async () => {
   }
 };
 
+export const createAssetWithName = async (asset) => {
+  try {
+    const token = getToken();
+    
+    // Fetch all assets to map the assetId to assetName
+    const assets = await getAssets(); // You can replace this with your logic to get the list of assets
+
+    // Find the asset name using the assetId
+    const assetDetails = assets.find(a => a.assetId === asset.assetId);
+
+    // If asset is not found, handle the error
+    if (!assetDetails) {
+      toast.error("Asset not found for the provided ID.");
+      return;
+    }
+
+    // Replace assetId with the assetName in the request payload
+    const updatedAsset = {
+      ...asset,
+      assetName: assetDetails.assetName,  // Adding the asset name
+      assetId: undefined  // Optionally remove assetId if not needed
+    };
+
+    // Send the request with the assetName
+    const response = await axios.post(ASSET_BASE_URL, updatedAsset, {
+      headers: { Authorization: token },
+    });
+
+    console.log("Created New Asset:", response.data);
+    return response.data;
+  } catch (error) {
+    handleAxiosError(error);
+  }
+};
+
 // Get assets by name
 export const getAssetsByName = async (name) => {
   try {

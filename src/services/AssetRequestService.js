@@ -18,6 +18,9 @@ export const getAssetRequests = async () => {
     const response = await axios.get(ASSET_REQUEST_BASE_URL, {
       headers: {
         Authorization: token,
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        Expires: "0",
       },
     });
     console.log("Fetched All Asset Requests:", response.data);
@@ -27,6 +30,7 @@ export const getAssetRequests = async () => {
     throw error;
   }
 };
+
 
 // Create a new asset request
 export const createAssetRequest = async (request) => {

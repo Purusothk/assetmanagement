@@ -1,35 +1,90 @@
 import React, { useState, useEffect } from "react";
+import { toast } from "react-toastify"; 
+import { fetchUserProfile } from "../../services/userService"; // Adjusted path
 
-const AssetRequestModal = ({ isOpen, onClose, asset, user, createAssetRequest, styles }) => {
-  const [reasonForRequest, setReasonForRequest] = useState("");
+const AssetRequestModal = ({ isOpen, onClose, asset, createAssetRequest, styles }) => {
+  const [assetReqReason, setAssetReqReason] = useState(""); // Track the reason for the request
+  const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState(null); // To store the logged-in user ID
+
+  // Automatically populate the fields from the asset props
+  const [newRequest, setNewRequest] = useState({
+    assetReqId: 0,
+    userId: 0,
+    assetId: asset?.assetId || 0,
+    categoryId: asset?.categoryId || 0, // Ensure it's an integer
+    assetReqDate: new Date().toISOString().split("T")[0], // Format date
+    assetReqReason: "",
+    request_Status: "Pending",
+  });
 
   useEffect(() => {
-    console.log("Modal Asset:", asset); // Log the asset object for debugging
-    console.log("Modal User:", user); // Log the user object for debugging
-  }, [asset, user]);
-
-  const handleRequest = async () => {
-    if (!user || !asset) {
-      console.error("User or Asset is not defined");
-      return;
-    }
-
-    const request = {
-      assetId: asset.assetId,
-      userId: user.userId,
-      categoryName: asset.categoryName || "N/A",
-      subCategoryName: asset.subCategoryName || "N/A",
-      assetName: asset.assetName || "N/A",
-      requestDate: new Date().toISOString(),
-      reasonForRequest,
+    // Fetch user profile to get the userId
+    const fetchUserData = async () => {
+      try {
+        const profile = await fetchUserProfile(); // This is a function you already have
+        setUserId(profile?.userId || 0); // Set the userId or default to 0
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+        toast.error("Failed to fetch user profile.");
+      }
     };
 
-    try {
-      await createAssetRequest(request);
-      onClose();
-    } catch (error) {
-      console.error("Error creating asset request:", error);
+    fetchUserData();
+  }, []);
+
+  // Update the newRequest with userId once it's fetched
+  useEffect(() => {
+    if (userId) {
+      setNewRequest((prevRequest) => ({
+        ...prevRequest,
+        userId,
+      }));
     }
+  }, [userId]);
+
+  const handleCreateAssetRequest = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+    setLoading(true);
+
+    try {
+      // Prepare the payload with corrected fields
+      const payload = {
+        assetReqId: newRequest.assetReqId,
+        userId: newRequest.userId,
+        assetId: newRequest.assetId,
+        categoryId: newRequest.categoryId, // Ensure it's an integer
+        assetReqDate: newRequest.assetReqDate, // Already formatted as YYYY-MM-DD
+        assetReqReason: assetReqReason,
+        request_Status: newRequest.request_Status,
+      };
+
+      // Send the request
+      const response = await createAssetRequest(payload);
+
+      if (response) {
+        toast.success("Asset request created successfully.");
+        resetForm();
+        onClose();
+      }
+    } catch (error) {
+      toast.error("Failed to create asset request.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const validateForm = () => {
+    if (!assetReqReason.trim()) {
+      toast.error("Reason for request is required!");
+      return false;
+    }
+    return true;
+  };
+
+  const resetForm = () => {
+    setAssetReqReason("");
   };
 
   if (!isOpen) {
@@ -40,42 +95,20 @@ const AssetRequestModal = ({ isOpen, onClose, asset, user, createAssetRequest, s
     <div style={styles.modalOverlay}>
       <div style={styles.modalContent}>
         <h2 style={styles.heading}>Create New Asset Request</h2>
-        <div style={styles.formGroup}>
-          <label style={styles.label}>Asset Request</label>
-          <input type="text" value="Asset Request" readOnly style={styles.input} />
-        </div>
-        <div style={styles.formGroup}>
-          <label style={styles.label}>User ID</label>
-          <input type="text" value={user?.userId || "N/A"} readOnly style={styles.input} />
-        </div>
-        <div style={styles.formGroup}>
-          <label style={styles.label}>Category Name</label>
-          <input type="text" value={asset?.categoryName || "N/A"} readOnly style={styles.input} />
-        </div>
-        <div style={styles.formGroup}>
-          <label style={styles.label}>Subcategory Name</label>
-          <input type="text" value={asset?.subCategoryName || "N/A"} readOnly style={styles.input} />
-        </div>
-        <div style={styles.formGroup}>
-          <label style={styles.label}>Asset Name</label>
-          <input type="text" value={asset?.assetName || "N/A"} readOnly style={styles.input} />
-        </div>
-        <div style={styles.formGroup}>
-          <label style={styles.label}>Request Date</label>
-          <input type="text" value={new Date().toLocaleDateString()} readOnly style={styles.input} />
-        </div>
+
         <div style={styles.formGroup}>
           <label style={styles.label}>Reason for Request</label>
           <textarea
-            value={reasonForRequest}
-            onChange={(e) => setReasonForRequest(e.target.value)}
-            placeholder="Reason for Request"
+            value={assetReqReason}
+            onChange={(e) => setAssetReqReason(e.target.value)}
+            placeholder="Reason for request"
             style={styles.textarea}
             aria-label="Reason for Request"
           />
         </div>
-        <button onClick={handleRequest} style={styles.submitButton}>
-          Submit Request
+
+        <button onClick={handleCreateAssetRequest} style={styles.submitButton} disabled={loading}>
+          {loading ? "Submitting..." : "Submit Request"}
         </button>
         <button onClick={onClose} style={styles.closeButton}>
           Close

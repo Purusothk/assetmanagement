@@ -65,15 +65,19 @@ export const fetchUserById = async (id) => {
 export const fetchUserRole = async () => {
   try {
     const token = getToken();
+    if (!token) return null; // Return early if no token
+
     const response = await axios.get(`${USERS_BASE_URL}/role`, {
       headers: { Authorization: token },
     });
+
     console.log("Fetched User Role:", response.data);
     return response.data;
   } catch (error) {
     handleError(error, "Fetching User Role");
   }
 };
+
 
 // Fetch user profile
 export const fetchUserProfile = async () => {

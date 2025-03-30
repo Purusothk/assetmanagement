@@ -1,12 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getReturnRequests, createReturnRequest, updateReturnRequest, deleteReturnRequest } from '../../services/ReturnRequestService';
-import { getAssets } from '../../services/AssetService';
-import { getAssetRequests } from '../../services/AssetRequestService';
-import { getCategories } from '../../services/CategoryService';
-import Cookies from 'js-cookie';
-import {jwtDecode} from 'jwt-decode'; // Correctly import jwt-decode
-import { toast } from 'react-toastify';
+import {
+  getReturnRequests,
+  createReturnRequest,
+  updateReturnRequest,
+  deleteReturnRequest,
+} from "../../services/ReturnRequestService";
+import { getAssets } from "../../services/AssetService";
+import { getAssetRequests } from "../../services/AssetRequestService";
+import { getCategories } from "../../services/CategoryService";
+import { fetchUsers } from "../../services/userService";
+import Cookies from "js-cookie";
+import { jwtDecode } from "jwt-decode"; // Correctly import jwt-decode
+import { toast } from "react-toastify";
+
 // Error Boundary for unexpected errors
 class ErrorBoundary extends React.Component {
   state = { hasError: false };
@@ -16,7 +23,7 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
-    console.error('Error captured by Error Boundary:', error, info);
+    console.error("Error captured by Error Boundary:", error, info);
   }
 
   render() {
@@ -29,6 +36,7 @@ class ErrorBoundary extends React.Component {
 
 const ReturnRequestComponent = () => {
   const navigate = useNavigate();
+  const [users, setUsers] = useState([]);
   const [returnRequests, setReturnRequests] = useState([]);
   const [assets, setAssets] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -39,10 +47,9 @@ const ReturnRequestComponent = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [logsPerPage] = useState(10);
   const [showReturnRequestForm, setShowReturnRequestForm] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
-  const toggleFormVisibility = () => {
-    setShowReturnRequestForm(!showReturnRequestForm);
-  };
+  const toggleFormVisibility = () => setShowReturnRequestForm(!showReturnRequestForm);
 
   const resetNewRequest = () => {
     setNewRequest({
@@ -58,47 +65,52 @@ const ReturnRequestComponent = () => {
 
   // Form state for new return request
   const [newRequest, setNewRequest] = useState({
-    assetId: '',
-    userId: '',
-    categoryId: '',
-    returnDate: '',
-    condition: '',
-    reason: '',
+    assetId: "",
+    userId: "",
+    categoryId: "",
+    returnDate: "",
+    condition: "",
+    reason: "",
   });
 
   useEffect(() => {
     fetchReturnRequests();
     fetchAssets();
+    fetchUsersList();
     fetchCategories();
     fetchUserRole();
   }, []);
 
+  const fetchUsersList = async () => {
+    try {
+      const usersData = await fetchUsers();
+      setUsers(Array.isArray(usersData) ? usersData : []);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      setUsers([]);
+    }
+  };
+
+  const fetchUserRole = () => {
+    const token = Cookies.get("token");
+    if (token) {
+      const decoded = jwtDecode(token);
+      setUserRole(decoded.role);
+      setCurrentUserId(decoded.userId); // Store userId for filtering
+    }
+  };
+
   useEffect(() => {
-    if (userRole === 'employee') {
+    if (userRole === "employee") {
       fetchAssetRequests();
     }
   }, [userRole]);
 
-  const fetchUserRole = () => {
-    const token = Cookies.get('token');
-    if (token) {
-      const decoded = jwtDecode(token);
-      setUserRole(decoded.role);
-    }
-  };
-
   const fetchCategories = async () => {
     try {
       const data = await getCategories();
-      console.log("Fetched categories:", data); // Debugging log
-
-      if (data && Array.isArray(data.$values)) {
-        setCategories(data.$values);
-        logAction("Fetched categories successfully", "success");
-      } else {
-        setCategories([]);
-        logAction("No categories found", "info");
-      }
+      setCategories(data?.$values || []);
+      logAction("Fetched categories successfully", "success");
     } catch (error) {
       console.error("Error fetching categories:", error);
       logAction("Error fetching categories", "error");
@@ -109,15 +121,11 @@ const ReturnRequestComponent = () => {
     setLoading(true);
     try {
       const data = await getReturnRequests();
-      if (data && Array.isArray(data.$values)) {
-        setReturnRequests(data.$values);
-      } else {
-        setReturnRequests([]);
-      }
-      logAction('Fetched return requests successfully', 'success');
+      setReturnRequests(data?.$values || []);
+      logAction("Fetched return requests successfully", "success");
     } catch (error) {
-      console.error('Error fetching return requests:', error);
-      logAction('Failed to fetch return requests', 'error');
+      console.error("Error fetching return requests:", error);
+      logAction("Failed to fetch return requests", "error");
     } finally {
       setLoading(false);
     }
@@ -127,15 +135,11 @@ const ReturnRequestComponent = () => {
     setLoading(true);
     try {
       const data = await getAssets();
-      if (data && Array.isArray(data.$values)) {
-        setAssets(data.$values);
-      } else {
-        setAssets([]);
-      }
-      logAction('Fetched assets successfully', 'success');
+      setAssets(data?.$values || []);
+      logAction("Fetched assets successfully", "success");
     } catch (error) {
-      console.error('Error fetching assets:', error);
-      logAction('Failed to fetch assets', 'error');
+      console.error("Error fetching assets:", error);
+      logAction("Failed to fetch assets", "error");
     } finally {
       setLoading(false);
     }
@@ -145,15 +149,11 @@ const ReturnRequestComponent = () => {
     setLoading(true);
     try {
       const data = await getAssetRequests();
-      if (data && Array.isArray(data.$values)) {
-        setAssetRequests(data.$values);
-      } else {
-        setAssetRequests([]);
-      }
-      logAction('Fetched asset requests successfully', 'success');
+      setAssetRequests(data?.$values || []);
+      logAction("Fetched asset requests successfully", "success");
     } catch (error) {
-      console.error('Error fetching asset requests:', error);
-      logAction('Failed to fetch asset requests', 'error');
+      console.error("Error fetching asset requests:", error);
+      logAction("Failed to fetch asset requests", "error");
     } finally {
       setLoading(false);
     }
@@ -169,109 +169,69 @@ const ReturnRequestComponent = () => {
   const handleCreateReturnRequest = async () => {
     setLoading(true);
     try {
-      const createdRequest = await createReturnRequest({
-        ...newRequest,
-        returnDate: new Date(newRequest.returnDate).toISOString().split('T')[0],
-      });
-      setReturnRequests((prevRequests) => [...prevRequests, createdRequest]);
-      logAction('Created return request successfully', 'success');
+      await createReturnRequest(newRequest);
+      fetchReturnRequests();
+      logAction("Created return request successfully", "success");
       resetNewRequest();
     } catch (error) {
-      console.error('Error creating return request:', error);
-      logAction('Failed to create return request', 'error');
+      console.error("Error creating return request:", error);
+      logAction("Failed to create return request", "error");
+      toast.error("Failed to create return request.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleUpdateReturnRequest = (returnId) => {
-    const returnRequestToUpdate = returnRequests.find((request) => request.returnId === returnId);
-    if (returnRequestToUpdate) {
-      setNewRequest({
-        returnId: returnRequestToUpdate.returnId,
-        assetId: returnRequestToUpdate.assetId,
-        userId: returnRequestToUpdate.userId,
-        categoryId: returnRequestToUpdate.categoryId,
-        returnDate: returnRequestToUpdate.returnDate,
-        condition: returnRequestToUpdate.condition,
-        reason: returnRequestToUpdate.reason,
-      });
+    const returnRequestToUpdate = returnRequests.find((req) => req.returnId === returnId);
+    if (!returnRequestToUpdate) return console.error("No return request found for ID:", returnId);
 
-      setShowReturnRequestForm(true);
-    }
+    setNewRequest({ ...returnRequestToUpdate });
+    setShowReturnRequestForm(true);
   };
 
   const sendUpdateReturnRequest = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-
-      const updatedRequest = {
-        returnId: newRequest.returnId,
-        assetId: newRequest.assetId,
-        userId: newRequest.userId,
-        categoryId: newRequest.categoryId,
-        returnDate: newRequest.returnDate,
-        condition: newRequest.condition,
-        reason: newRequest.reason,
-      };
-
-      const response = await updateReturnRequest(updatedRequest.returnId, updatedRequest);
-
-      if (response) {
-        setReturnRequests((prevRequests) =>
-          prevRequests.map((request) =>
-            request.returnId === updatedRequest.returnId ? response : request
-          )
-        );
-
-        logAction("Updated return request successfully", "success");
-        resetNewRequest();
-        setShowReturnRequestForm(false); // Hide the form after update
-      } else {
-        throw new Error("Error updating return request");
-      }
+      await updateReturnRequest(newRequest.returnId, newRequest);
+      fetchReturnRequests();
+      logAction("Updated return request successfully", "success");
+      resetNewRequest();
+      setShowReturnRequestForm(false);
     } catch (error) {
-      console.error("Error during return request update:", error);
+      console.error("Error updating return request:", error);
       logAction("Error updating return request", "error");
-      toast.error("Failed to update the return request.");
+      toast.error("Failed to update return request.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteReturnRequest = async (id) => {
-    if (!window.confirm('Are you sure?')) return;
+    if (!window.confirm("Are you sure?")) return;
     setLoading(true);
     try {
       await deleteReturnRequest(id);
       fetchReturnRequests();
-      logAction('Deleted return request successfully', 'success');
+      logAction("Deleted return request successfully", "success");
     } catch (error) {
-      console.error('Error deleting return request:', error);
-      logAction('Failed to delete return request', 'error');
+      console.error("Error deleting return request:", error);
+      logAction("Failed to delete return request", "error");
     } finally {
       setLoading(false);
     }
   };
 
   // Pagination logic
-  const indexOfLastRequest = currentPage * logsPerPage;
-  const indexOfFirstRequest = indexOfLastRequest - logsPerPage;
-  const currentRequests = Array.isArray(returnRequests)
-    ? returnRequests.slice(indexOfFirstRequest, indexOfLastRequest)
-    : [];
-
+  const currentRequests = returnRequests.slice((currentPage - 1) * logsPerPage, currentPage * logsPerPage);
   const totalPages = Math.ceil(returnRequests.length / logsPerPage);
 
   // Filter assets based on user role
-  const filteredAssets =
-    userRole === 'admin'
-      ? assets
-      : assets;
-      // .filter((asset) =>
-      //           assetRequests.some((req) => req.assetId === asset.assetId)
-      //         );
+  const filteredAssets = userRole === "employee" ? assets.filter((a) => a.assignedTo === currentUserId) : assets;
 
+   
+
+       
 
 return (
               <ErrorBoundary>

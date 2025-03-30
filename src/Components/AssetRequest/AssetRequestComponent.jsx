@@ -8,8 +8,6 @@ import Cookies from "js-cookie";
 import {jwtDecode} from "jwt-decode";
 import ErrorBoundary from "../../ErrorBoundary/ErrorBoundary";
 import { toast } from "react-toastify";
-import HeaderFooter from '../HeaderFooter';
-import { useAuth } from "../../contexts/AuthContext";
 
 const AssetRequestComponent = () => {
   const [requests, setRequests] = useState([]);
@@ -33,8 +31,6 @@ const [newRequest, setNewRequest] = useState({
 });
 const [isAdmin, setIsAdmin] = useState(false);
 const navigate = useNavigate();
-const [loggedTime, setLoggedTime] = useState('');
-const { logout, authState } = useAuth();
 
 useEffect(() => {
   fetchAssetRequests();
@@ -56,11 +52,12 @@ useEffect(() => {
   const fetchAssetRequests = async () => {
     try {
       const data = await getAssetRequests();
-      setRequests(data.$values);
+      setRequests(data.$values);  // ✅ This is correct
     } catch (error) {
       logAction("Error fetching asset requests", "error");
     }
   };
+  
 
   const fetchAssets = async () => {
     try {
@@ -81,6 +78,7 @@ useEffect(() => {
   };
 
   const fetchSubCategories = async (categoryId) => {
+    if (!categoryId) return; // Prevent unnecessary API call
     try {
       const data = await getSubCategories(categoryId);
       setSubCategories(data.$values);
@@ -88,36 +86,73 @@ useEffect(() => {
       logAction("Error fetching subcategories", "error");
     }
   };
+  
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-  
+    
     let updatedValue = value;
-  
+    
+    // For categoryId and subCategoryId, make sure to handle undefined or null values
     if (name === "categoryId" || name === "subCategoryId") {
-      updatedValue = parseInt(value, 10).toString(); // Convert to integer and then to string
+      updatedValue = value ? parseInt(value, 10) : null;
     }
-  
+    
     setNewRequest((prev) => ({ ...prev, [name]: updatedValue }));
   };
+  
+  // In UserService.js
+  const getUserNameById = async (userId) => {
+    try {
+      const timestamp = new Date().getTime(); // Unique value to avoid cache
+      const response = await fetch(`http://localhost:3000/api/users/${userId}?_=${timestamp}`);
+      const data = await response.json();
+      return data.userName; 
+    } catch (error) {
+      console.error("Error fetching user name", error);
+      return null;
+    }
+  };
+  
+
   
 
   const handleCreateAssetRequest = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
     setLoading(true);
+  
     try {
+      const userName = await getUserNameById(newRequest.userId);
+      if (!userName) {
+        toast.error("User not found!");
+        return;
+      }
+  
+      const asset = assets.find(a => a.assetId === parseInt(newRequest.assetId, 10));
+      if (!asset) {
+        toast.error("Asset not found!");
+        return;
+      }
+  
+      const category = categories.find(c => c.categoryId === parseInt(newRequest.categoryId, 10));
+      if (!category) {
+        toast.error("Category not found!");
+        return;
+      }
+  
       const payload = {
-        assetRequest: newRequest.assetRequest,
-        userId: parseInt(newRequest.userId, 10),
-        assetId: parseInt(newRequest.assetId, 10),
-        categoryId: newRequest.categoryId.toString(),
-        subCategoryId: newRequest.subCategoryId ? newRequest.subCategoryId.toString() : null,
+        assetReqId: newRequest.assetReqId,
+        userName,
+        assetName: asset.assetName,
+        userId: newRequest.userId,
+        assetId: asset.assetId,
+        categoryName: category.categoryName,
         assetReqDate: newRequest.assetReqDate,
-        assetReqReason: newRequest.assetReqReason || "", // Make sure AssetReqReason is always a string
-        Request_Status: newRequest.Request_Status || "Pending",
+        assetReqReason: newRequest.assetReqReason,
+        requestStatus: 0, // Default to Pending
       };
-      
+  
       const response = await createAssetRequest(payload);
       if (response) {
         logAction("Created new asset request successfully", "success");
@@ -132,62 +167,119 @@ useEffect(() => {
   };
   
 
-  const sendUpdateRequest = async () => {
-    const existingRequest = requests.find(request => request.assetReqId === newRequest.assetReqId);
   
-    if (!existingRequest) {
-      console.error("Existing request not found!");
+  
+
+const sendUpdateRequest = async () => {
+  const existingRequest = requests.find(request => request.assetReqId === newRequest.assetReqId);
+
+  if (!existingRequest) {
+    console.error("Existing request not found!");
+    return;
+  }
+
+  // Fetch the necessary fields
+  try {
+    // Get UserName based on userId
+    const userName = await getUserNameById(newRequest.userId);
+    if (userName) {
+      toast.error("User not found!");
       return;
     }
-  
+
+    // Get AssetName based on assetId
+    const assetId = parseInt(newRequest.assetId, 10);
+    if (isNaN(assetId)) {
+      toast.error("Invalid Asset ID");
+      return;
+    }
+    const asset = assets.find(asset => asset.assetId === assetId);
+    if (!asset) {
+      toast.error("Asset not found!");
+      return;
+    }
+
+    const assetName = asset ? asset.assetName : null; // Assuming `assetName` exists in the asset object
+    if (!assetName) {
+      toast.error("Asset not found!");
+      return;
+    }
+
+    // Get CategoryName based on categoryId
+    const category = categories.find(category => category.categoryId === parseInt(newRequest.categoryId, 10));
+    const categoryName = category ? category.categoryName : null; // Assuming `categoryName` exists in the category object
+    if (!categoryName) {
+      toast.error("Category not found!");
+      return;
+    }
+
+    // Construct the payload with the required fields
     const payload = {
-      assetReqId: newRequest.assetReqId,
+      assetReqId: newRequest.assetReqId, // Keep the existing assetReqId for update
       assetRequest: newRequest.assetRequest || existingRequest.assetRequest, // Use new or existing value
+      userName: userName, // Add UserName field
       userId: existingRequest.userId,
       assetId: existingRequest.assetId,
-      categoryId: newRequest.categoryId.toString(), // Convert categoryId to string
-      subCategoryId: newRequest.subCategoryId ? newRequest.subCategoryId.toString() : null,
+      assetName: assetName, // Add AssetName field
+      categoryName: categoryName, // Add CategoryName field
       assetReqDate: existingRequest.assetReqDate,
-      assetReqReason: existingRequest.assetReqReason,
+      assetReqReason: newRequest.assetReqReason || existingRequest.assetReqReason, // Use new or existing value
       requestStatus: parseInt(newRequest.requestStatus, 10), // Ensure this is correctly formatted as integer
       password: newRequest.password
     };
-  
-    try {
-      const response = await updateAssetRequest(payload.assetReqId, payload);
-      if (response) {
-        logAction("Updated asset request successfully", "success");
-        fetchAssetRequests();
-      } else {
-        throw new Error("Failed to update asset request");
-      }
-    } catch (error) {
-      console.error("Error updating asset request:", error);
-      logAction("Failed to update asset request", "error");
+
+    // Send the update request
+    const response = await updateAssetRequest(payload.assetReqId, payload);
+    if (response) {
+      logAction("Updated asset request successfully", "success");
+      fetchAssetRequests();
+    } else {
+      throw new Error("Failed to update asset request");
     }
-  };
+  } catch (error) {
+    console.error("Error updating asset request:", error);
+    logAction("Failed to update asset request", "error");
+  }
+};
+
+
+  
   
   
 
+  // const handleUpdateAssetRequest = (assetReqId) => {
+  //   const requestToUpdate = requests.find((request) => request.assetReqId === assetReqId);
+    
+  //   if (requestToUpdate) {
+  //     setNewRequest({
+  //       assetReqId: requestToUpdate.assetReqId,
+  //       assetRequest: requestToUpdate.assetRequest || "", // Ensure assetRequest is a string
+  //       userId: requestToUpdate.userId ? requestToUpdate.userId.toString() : "", // Handle undefined values
+  //       assetId: requestToUpdate.assetId ? requestToUpdate.assetId.toString() : "", // Handle undefined values
+  //       categoryId: requestToUpdate.categoryId ? requestToUpdate.categoryId.toString() : "", // Handle undefined values
+  //       subCategoryId: requestToUpdate.subCategoryId ? requestToUpdate.subCategoryId.toString() : "", // Handle undefined values
+  //       assetReqDate: requestToUpdate.assetReqDate ? requestToUpdate.assetReqDate.split("T")[0] : "",
+  //       assetReqReason: requestToUpdate.assetReqReason || "", // Ensure assetReqReason is a string
+  //       requestStatus: requestToUpdate.requestStatus ? requestToUpdate.requestStatus.toString() : "", // Handle undefined values
+  //       password: "", // Reset password field
+  //     });
+  //     setShowCreateRequestForm(true); // Show form for updating
+  //   }
+  // };
+  
   const handleUpdateAssetRequest = (assetReqId) => {
-    const requestToUpdate = requests.find((request) => request.assetReqId === assetReqId);
+    const requestToUpdate = requests.find(request => request.assetReqId === assetReqId);
+  
     if (requestToUpdate) {
       setNewRequest({
-        assetReqId: requestToUpdate.assetReqId,
-        assetRequest: requestToUpdate.assetRequest,
-        userId: requestToUpdate.userId.toString(),
-        assetId: requestToUpdate.assetId.toString(),
-        categoryId: requestToUpdate.categoryId.toString(),
-        subCategoryId: requestToUpdate.subCategoryId ? requestToUpdate.subCategoryId.toString() : "",
-        assetReqDate: requestToUpdate.assetReqDate.split("T")[0], // Ensure date format is correct
-        assetReqReason: requestToUpdate.assetReqReason,
-        requestStatus: requestToUpdate.requestStatus.toString(),
+        ...requestToUpdate, // Keep all existing values
+        assetReqDate: requestToUpdate.assetReqDate.split("T")[0], // Format date
         password: "", // Reset password field
       });
-      setShowCreateRequestForm(true); // Show form for updating
+      setShowCreateRequestForm(true);
     }
   };
-
+  
   const validateForm = () => {
     if (!newRequest.assetRequest) {
       toast.error("Asset Request is required!");
@@ -201,8 +293,13 @@ useEffect(() => {
       toast.error("Category ID is required!");
       return false;
     }
+    if (!newRequest.assetId) {
+      toast.error("Asset ID is required!");
+      return false;
+    }
     return true;
   };
+  
 
   const resetForm = () => {
     setNewRequest({
@@ -228,10 +325,6 @@ useEffect(() => {
     };
     setActionLogs((prevLogs) => [newLog, ...prevLogs]);
   };
-  useEffect(() => {
-    const now = new Date();
-    setLoggedTime(now.toLocaleTimeString());
-  }, []);
 
   const getStatusText = (status) => {
     switch (status) {
@@ -250,13 +343,7 @@ useEffect(() => {
   return (
     <ErrorBoundary>
       <div style={styles.container}>
-      {authState.user && (
-        <HeaderFooter userName={authState.user.sub} userRole={authState.user.role} loggedTime={loggedTime} />
-      )}
-      
-        <button style={styles.backButton} onClick={() => navigate(-1)}>
-          Back
-        </button>
+        <button style={styles.backButton} onClick={() => navigate(-1)}>Back</button>
         <h1 style={styles.heading}>Asset Requests</h1>
   
         {/* Create or Update Asset Request Form */}
@@ -265,11 +352,7 @@ useEffect(() => {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (newRequest.assetReqId) {
-                sendUpdateRequest();
-              } else {
-                handleCreateAssetRequest(e); // Pass the event to handleCreateAssetRequest
-              }
+              newRequest.assetReqId ? sendUpdateRequest() : handleCreateAssetRequest(e);
             }}
             style={styles.form}
           >
@@ -396,86 +479,90 @@ useEffect(() => {
                     <option value="2">Rejected</option>
                   </select>
                 </div>
-                <div style={styles.formGroup}>
-                  <label htmlFor="password" style={styles.label}>Password:</label>
-                  <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    value={newRequest.password}
-                    onChange={handleInputChange}
-                    placeholder="Password"
-                    style={styles.input}
-                  />
-                </div>
               </>
             )}
-            <button
-              type="submit"
-              style={styles.submitButton}
-              disabled={loading}
-              >
-                {loading ? 'Processing...' : newRequest.assetReqId ? 'Update Request' : 'Submit Request'}
-              </button>
-            </form>
-          </section>
-    
-          {/* Display Asset Requests in a Table */}
-          <section style={styles.listSection}>
-            <h2 style={styles.subHeading}>Asset Requests List</h2>
-            {requests.length > 0 ? (
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.tableHeader}>User ID</th>
-                    <th style={styles.tableHeader}>Asset Name</th>
-                    <th style={styles.tableHeader}>Category Name</th>
-                    <th style={styles.tableHeader}>Subcategory Name</th>
-                    <th style={styles.tableHeader}>Reason for Request</th>
-                    <th style={styles.tableHeader}>Request Date</th>
-                    <th style={styles.tableHeader}>Status</th>
-                    {isAdmin && <th style={styles.tableHeader}>Actions</th>}
+            <button type="submit" style={styles.submitButton} disabled={loading}>
+              {loading ? 'Processing...' : newRequest.assetReqId ? 'Update Request' : 'Submit Request'}
+            </button>
+          </form>
+        </section>
+  
+        {/* Display Asset Requests in a Table */}
+        <section style={styles.listSection}>
+          <h2 style={styles.subHeading}>Asset Requests List</h2>
+          {requests.length > 0 ? (
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.tableHeader}>User ID</th>
+                  <th style={styles.tableHeader}>Asset Name</th>
+                  <th style={styles.tableHeader}>Category Name</th>
+                  <th style={styles.tableHeader}>Subcategory Name</th>
+                  <th style={styles.tableHeader}>Reason for Request</th>
+                  <th style={styles.tableHeader}>Request Date</th>
+                  <th style={styles.tableHeader}>Status</th>
+                  {isAdmin && <th style={styles.tableHeader}>Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {requests.map((request) => (
+                  <tr key={request.assetReqId}>
+                    <td>{request.userId}</td>
+                    <td>{request.assetName || "N/A"}</td>
+                    <td>{request.categoryName || "N/A"}</td>
+                    <td>{request.subCategoryName || "N/A"}</td>
+                    <td>{request.assetReqReason}</td>
+                    <td>{new Date(request.assetReqDate).toLocaleDateString()}</td>
+                    <td>
+                      <span
+                        style={{
+                          color:
+                            request.requestStatus === "0"
+                              ? "orange"
+                              : request.requestStatus === "1"
+                              ? "green"
+                              : "red",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {getStatusText(request.requestStatus)}
+                      </span>
+                    </td>
+                    {isAdmin && (
+                      <td>
+                        <button
+                          onClick={() => handleUpdateAssetRequest(request.assetReqId)}
+                          style={{
+                            backgroundColor: "#007bff", // Blue color
+                            color: "white",
+                            border: "none",
+                            padding: "8px 12px",
+                            borderRadius: "4px",
+                            cursor: "pointer",
+                            fontWeight: "bold",
+                            transition: "background-color 0.3s ease",
+                          }}
+                          onMouseOver={(e) => (e.target.style.backgroundColor = "#0056b3")} // Darker blue on hover
+                          onMouseOut={(e) => (e.target.style.backgroundColor = "#007bff")}
+                        >
+                          Update
+                        </button>
+                      </td>
+                    )}
+
                   </tr>
-                </thead>
-                <tbody>
-                  {requests.map((request) => {
-                    const asset = request.asset || {};
-                    const categoryName = categories.find((cat) => cat.categoryId === asset.categoryId)?.categoryName || "Unknown";
-                    const subCategoryName = subCategories.find((sub) => sub.subCategoryId === asset.subCategoryId)?.subCategoryName || "Unknown";
-                    return (
-                      <tr key={request.assetReqId} style={styles.tableRow}>
-                        <td style={styles.tableCell}>{request.userId}</td>
-                        <td style={styles.tableCell}>{asset.assetName || "Unknown"}</td>
-                        <td style={styles.tableCell}>{categoryName}</td>
-                        <td style={styles.tableCell}>{subCategoryName}</td>
-                        <td style={styles.tableCell}>{request.assetReqReason}</td>
-                        <td style={styles.tableCell}>
-                          {request.assetReqDate ? new Intl.DateTimeFormat('en-GB').format(new Date(request.assetReqDate)) : "N/A"}
-                        </td>
-                        <td style={styles.tableCell}>{getStatusText(request.requestStatus)}</td>
-                        {isAdmin && (
-                          <td style={styles.tableCell}>
-                            <button
-                              onClick={() => handleUpdateAssetRequest(request.assetReqId)}
-                              style={styles.actionButton}
-                            >
-                              Update
-                            </button>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            ) : (
-              <p style={styles.noRequests}>No asset requests available</p>
-            )}
-          </section>
-        </div>
-      </ErrorBoundary>
-    );
-    
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p style={styles.noRequests}>No asset requests available</p>
+          )}
+        </section>
+      </div>
+    </ErrorBoundary>
+  );
+  
+  
   
   
 

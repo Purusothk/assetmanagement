@@ -25,6 +25,7 @@ const Asset = () => {
     AssetName: "",
     assetDescription: "",
     categoryId: "",
+    assetRequestDto:"Pending",
     subCategoryId: "",
     assetImage: null,
     SerialNumber: "",
@@ -191,6 +192,7 @@ const Asset = () => {
     // Append the fields to formData
     formData.append("AssetName", newAsset.AssetName);
     formData.append("assetDescription", newAsset.assetDescription);
+    formData.append("assetRequestDto", newAsset.assetRequestDto);
     formData.append("categoryId", newAsset.categoryId);
     formData.append("subCategoryId", newAsset.subCategoryId);
     formData.append("SerialNumber", newAsset.SerialNumber);
@@ -248,6 +250,7 @@ const Asset = () => {
     formData.append("AssetId", newAsset.assetId);
     formData.append("AssetName", newAsset.AssetName);
     formData.append("AssetDescription", newAsset.assetDescription);
+    formData.append("assetRequestDto", newAsset.assetRequestDto);
     formData.append("CategoryId", newAsset.categoryId);
     formData.append("SubCategoryId", newAsset.subCategoryId);
     formData.append("SerialNumber", newAsset.SerialNumber);
@@ -314,6 +317,7 @@ const Asset = () => {
     setNewAsset({
       AssetName: "",
       assetDescription: "",
+      assetRequestDto:"Pending",
       categoryId: "",
       subCategoryId: "",
       assetImage: null,
@@ -379,6 +383,17 @@ const Asset = () => {
                 <textarea
                   name="assetDescription"
                   value={newAsset.assetDescription}
+                  onChange={handleInputChange}
+                  placeholder="Description"
+                  style={styles.input}
+                  aria-label="Asset Description"
+                />
+              </div>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Asset request dto</label>
+                <textarea
+                  name="assetRequestDto"
+                  value={newAsset.assetRequestDto}
                   onChange={handleInputChange}
                   placeholder="Description"
                   style={styles.input}

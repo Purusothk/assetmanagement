@@ -114,7 +114,8 @@ const MaintenanceLogComponent = () => {
     setLoading(true);
     try {
       const createdLog = await createMaintenanceLog(maintenanceLog);
-      setMaintenanceLogs((prevLogs) => [...prevLogs, createdLog]);
+setMaintenanceLogs((prevLogs) => [...prevLogs, createdLog.$values || createdLog]);
+
       logAction("Created maintenance log successfully", "success");
       resetFormState();
     } catch (error) {
@@ -146,10 +147,22 @@ const MaintenanceLogComponent = () => {
   const sendUpdateMaintenanceLog = async (maintenanceLog) => {
     setLoading(true);
     try {
-      const updatedLog = await updateMaintenanceLog(
-        maintenanceLog.MaintenanceId,
-        maintenanceLog
-      );
+      // Find Asset Name based on Asset ID
+      const asset = assets.find((a) => a.assetId === maintenanceLog.AssetId);
+      const assetName = asset ? asset.assetName : "Unknown";
+  
+      // Find User Name based on User ID
+      const userName = maintenanceLogs.find(
+        (log) => log.UserId === maintenanceLog.UserId
+      )?.user?.userName || "Unknown";
+  
+      const updatedLog = await updateMaintenanceLog(maintenanceLog.maintenanceId, {
+        ...maintenanceLog,
+        assetName,
+        userName,
+      });
+      
+  
       setMaintenanceLogs((prevLogs) =>
         prevLogs.map((log) =>
           log.MaintenanceId === maintenanceLog.MaintenanceId ? updatedLog : log
@@ -165,6 +178,7 @@ const MaintenanceLogComponent = () => {
       setLoading(false);
     }
   };
+  
 
   const handleDeleteMaintenanceLog = async (id) => {
     if (!window.confirm("Are you sure?")) return;
@@ -203,7 +217,8 @@ const MaintenanceLogComponent = () => {
   const indexOfLastLog = currentPage * logsPerPage;
   const indexOfFirstLog = indexOfLastLog - logsPerPage;
   const currentLogs = maintenanceLogs.slice(indexOfFirstLog, indexOfLastLog);
-  const totalPages = Math.ceil(maintenanceLogs.length / logsPerPage);
+  const totalPages = Math.max(1, Math.ceil(maintenanceLogs.length / logsPerPage));
+
 
   return (
     <ErrorBoundary>
@@ -259,8 +274,9 @@ const MaintenanceLogComponent = () => {
     <option value="">Select Asset</option>
     {assets.map((asset) => (
       <option key={asset.assetId} value={asset.assetId}>
-        {asset.assetName}
-      </option>
+      {asset.assetName || "Unnamed Asset"}
+    </option>
+    
     ))}
   </select>
 </div>
@@ -315,7 +331,10 @@ const MaintenanceLogComponent = () => {
                   <tr key={log.maintenanceId} style={styles.tableRow}>
                     <td style={styles.tableCell}>{log.maintenance_Description}</td>
                     <td style={styles.tableCell}>{log.maintenance_date}</td>
-                    <td style={styles.tableCell}>Rs.{log.cost}</td>
+                    <td style={styles.tableCell}>
+                      {log.cost !== undefined && log.cost !== null ? `Rs.${log.asset.value}` : "N/A"}
+                    </td>
+
                     <td style={styles.tableCell}>
                       {log.asset?.assetName || 'Unknown'}
                     </td>

@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { getAssets } from "../services/AssetService";
 import { getAssetRequests } from "../services/AssetRequestService";
 import { getServiceRequests } from "../services/ServiceRequestService";
+import {getReturnRequests} from "../services/ReturnRequestService";
 import { getMaintenanceLogs } from "../services/MaintainenceLogService";
 import HeaderFooter from "../Components/HeaderFooter";
 import "./employee.css";
@@ -96,6 +97,15 @@ const EmpDashboard = () => {
           }
         >
           Asset Requests
+        </button>
+
+        <button
+          className="button"
+          onClick={() =>
+            handleFetchData(getReturnRequests, "Return Requests", "/return-requests")
+          }
+        >
+          Return Requests
         </button>
         <button
           className="button"
